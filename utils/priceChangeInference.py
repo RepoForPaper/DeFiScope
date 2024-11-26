@@ -221,7 +221,7 @@ You will be provided with some changes of variables in the price calculation mod
         return ("\n").join(variable_change)
     
     def get_evaluation_score(self, client: OpenAI) -> Tuple[List[int], List[str], ChatCompletion]:
-        temperature = 0.3
+        temperature = 0
         top_p = 0.5
         model = "ft:gpt-3.5-turbo-1106:metatrust-labs::8zFctmxs" # Fine-tuned model
         # model = "gpt-3.5-turbo" #@test Original model
