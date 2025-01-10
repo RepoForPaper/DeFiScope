@@ -1,4 +1,7 @@
 ## How to use
+### Environment
+
+Python 3.10.12
 
 ### Install dependencies
 
