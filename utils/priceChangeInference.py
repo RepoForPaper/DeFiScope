@@ -6,6 +6,7 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
 from utils.actionType import DeFiActionType
+from utils.gen_with_local_model import generate_completion
 
 class Tendency(Enum):
     INCREASE = "Increase"
@@ -58,13 +59,19 @@ class PriceChangeInferenceUnit:
                  code_snippet: Optional[str], 
                  variables_change: Dict[str, Dict[str, int]],
                  contract_name_mapping: Dict[str, str],
-                 token_name_mapping: Dict[str,str]) -> None:
+                 token_name_mapping: Dict[str,str],
+                 model,
+                 tokenizer,
+                 device) -> None:
         self.contract_name_mapping = contract_name_mapping
         self.token_name_mapping = token_name_mapping
         self.pool_address = pool_address
         self.token_address_list = token_address_list
         self.code_snippet = code_snippet
         self.variables_change = variables_change
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
         self.price_change_inference = self.generate_price_change_inference()
     
     def generate_prompt(self) -> Tuple[str, List[str]]:
@@ -227,47 +234,42 @@ You will be provided with some changes of variables in the price calculation mod
         # model = "gpt-3.5-turbo" #@test Original model
 
         (prompt, statements) = self.generate_prompt()
-        # #@debug-start
-        # print(prompt)
-        # exit()
-        # #@debug-end
-        try:
-            completion = client.chat.completions.create(
-                model = model,
-                messages=[
-                {"role": "system", "content": "You are a price oracle of DeFi protocols, your job is to evaluate the price change of assets based on the given information."},
-                {"role": "user", "content": prompt}
-                ],
-                temperature=temperature,
-                top_p=top_p,
-            )
+        if self.model and self.tokenizer and self.device:
+            try:
+                decoded_output = generate_completion(prompt=prompt,
+                                                     model=self.model,
+                                                     tokenizer=self.tokenizer,
+                                                     device=self.device)
+                scores = []
+                scores = self.extract_scores(decoded_output, len(statements))
+                return (scores, statements, decoded_output)
+            except Exception as e:
+                print("[!]Error: {error}".format(error=e))
+                return ([0] * len(statements), statements, None)
+        else:
+            try:
+                completion = client.chat.completions.create(
+                    model = model,
+                    messages=[
+                    {"role": "system", "content": "You are a price oracle of DeFi protocols, your job is to evaluate the price change of assets based on the given information."},
+                    {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    top_p=top_p,
+                )
+                
+                scores = []
+                for choice in completion.choices:
+                    answer = choice.message.content
+                    scores = self.extract_scores(answer, len(statements))
+                
+                return (scores, statements, completion)
             
-            scores = []
-            #@debug-start
-            # chat_id = completion.id[-6:]
-            # txhash = os.environ.get('TXHASH')
-            # file_name = txhash[:6]
-            # store_prompt_path = os.path.join(f"/Volumes/Elements/Paper/Baseline_LLM_log/{file_name}", f'prompt_{chat_id}.txt')
-            # store_res_path = os.path.join(f"/Volumes/Elements/Paper/Baseline_LLM_log/{file_name}", f'res_{chat_id}.txt')
-            # with open(store_prompt_path, "w") as f:
-            #     f.write(prompt)
-            #@debug-end
-            for choice in completion.choices:
-                answer = choice.message.content
-                #@debug-start
-                # with open(store_res_path, "a") as f:
-                #     f.write(answer)
-                # print("[*]Answer: \n", answer)
-                #@debug-end
-                scores = self.extract_scores(answer)
-            
-            return (scores, statements, completion)
+            except Exception as e:
+                print("[!]Error: {error}".format(error=e))
+                return ([0] * len(statements), statements, None)
         
-        except Exception as e:
-            print("[!]Error: {error}".format(error=e))
-            return ([0] * len(statements), statements, None)
-        
-    def extract_scores(self, completion: str) -> List[int]:
+    def extract_scores(self, completion: str, statement_len: int) -> List[int]:
         """
         Args:
             completion: the completion string
@@ -276,7 +278,7 @@ You will be provided with some changes of variables in the price calculation mod
         """
         pattern = r"\d+\).*:(\s*\d+)" # match i) xxxxx : {score}
         scores = re.findall(pattern, completion)
-        scores = [int(s) for s in scores]
+        scores = [int(s) for s in scores[:statement_len]]
         return scores
 
     def generate_answer_format(self, statements: List[str]) -> List[str]:

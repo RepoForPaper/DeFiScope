@@ -4,6 +4,7 @@ import shutil
 import argparse
 import jsonlines
 from itertools import combinations
+import torch
 
 from utils.transaction import Transaction
 from utils.detector import Detector
@@ -12,8 +13,9 @@ from utils.debug_log import *
 from utils.tranxToUserCalls import extract_userCalls_from_tranx
 from utils.checkFlashloan import flagFlashloan
 from utils.matchRelatedActions import matchRelatedActions
-from utils.multiThreadHelper import multi_thread
+from utils.multiThreadHelper import multi_thread, multi_thread_cuda
 from utils.fast_filter import fast_filter
+from utils.load_model import load_model_for_device
 
 # run nano ~/.bash_profile, write: export OPENAI_API_KEY='your-api-key-here'
 # run source ~/.bash_profile to import openAI API key first
@@ -39,11 +41,26 @@ parser.add_argument("--debug",
                     default=False,
                     help="Enable debug mode",
                     dest="debug_mode")
+parser.add_argument("--use_local_model", 
+                    action="store_true", 
+                    help="Use local model (default: False)")
+parser.add_argument("--model_path", 
+                    type=str, 
+                    help="Local model path / Huggingface model name  (required if --use_huggingface_model)")
 args = parser.parse_args()
 
 txhash = args.txhash
 platform = args.platform
 debug_mode = args.debug_mode
+use_local_model = args.use_local_model
+
+if use_local_model:
+    if args.model_path is None:
+        raise ValueError("Please provide a model path when using --use_local_model.")
+    model_path = args.model_path
+    device = torch.device("cuda:0") # Ajust this based on your env
+else:
+    model_path = None
 
 start_time = time.time()
 result = ""
@@ -76,7 +93,11 @@ else:
         # for userCall in userCalls:
         #     userCall.priceChangeInference = userCall.generate_price_change_inference(defiActions=userCall.defiActions,functions=userCall.functions)
         
-        multi_thread(userCalls)
+        if use_local_model:
+            model, tokenizer = load_model_for_device(model_path=model_path, device=device)
+            multi_thread_cuda(userCalls=userCalls, model=model, tokenizer=tokenizer, device=device)
+        else:
+            multi_thread(userCalls)
 
         filtered_userCalls = [userCall 
                             for userCall in userCalls 

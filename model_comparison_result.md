@@ -45,4 +45,15 @@ batch_size = 2
 
 # Comparison between Phi-3 and GPT family
 
+## Inference Setup
+
+```
+do_sample=True
+top_p=1.0,
+temperature=1e-8, # Nearly deterministic, cannot set to 0: ValueError: `temperature` (=0) has to be a strictly positive float, otherwise your next token scores will be invalid.
+max_new_tokens=128000 - prompt_length # Adjust this based on your model
+```
+
+## Result
+
 ![Image](https://github.com/user-attachments/assets/8890b514-2bf9-4883-82b0-bf4e5cf233b7)
