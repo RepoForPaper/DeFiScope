@@ -93,8 +93,11 @@ class Function:
         else:
             print("[!]Cannot find the flattened contract files")
             shutil.rmtree(os.path.join("tmp", contract_address))
-        shutil.rmtree("crytic-export")
-        print("[*]Refactor the file structure successfully")
+        try:
+            shutil.rmtree("crytic-export")
+            print("[*]Refactor the file structure successfully")
+        except:
+            print("[!]Failed to refactor the file structure")
 
     def get_contracts(self) -> Tuple[Optional[Contract], Optional[Slither]]:
         if not os.path.exists(os.path.join("tmp",self.contract_address)) or not os.path.exists(os.path.join("tmp",self.contract_address,self.contract_name+".sol")):
