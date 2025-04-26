@@ -1,3 +1,4 @@
+from ast import mod
 import re
 from typing import List, Dict, Tuple, Set, Optional
 from itertools import combinations
@@ -223,7 +224,10 @@ class UserCall:
 
     def generate_price_change_inference(self, 
                                         defiActions: List[DeFiAction], 
-                                        functions: List[Tuple[str,str,List[Account]]]) -> Dict[PriceChangeInferenceKey, Dict[str, Tendency]]:
+                                        functions: List[Tuple[str,str,List[Account]]],
+                                        model=None,
+                                        tokenizer=None,
+                                        device=None) -> Dict[PriceChangeInferenceKey, Dict[str, Tendency]]:
         """
         Args:
             defiPurpose: a list of DeFiActionType objects
@@ -269,7 +273,10 @@ class UserCall:
                         code_snippet=code_snippet,
                         variables_change=variables_change,
                         contract_name_mapping=CONTRACT_NAME,
-                        token_name_mapping=TOKEN_NAME
+                        token_name_mapping=TOKEN_NAME,
+                        model=model,
+                        tokenizer=tokenizer,
+                        device=device
                     )
                     # Cumulate the effect of the price change tendency
                     tokenPriceChangeTendency = self.cumulate_price_change_tendency(priceChangeUnit=priceChangeUnit, tokenPriceChangeTendency=tokenPriceChangeTendency)
@@ -307,7 +314,10 @@ class UserCall:
                             code_snippet=code_snippet,
                             variables_change=variables_change,
                             contract_name_mapping=CONTRACT_NAME,
-                            token_name_mapping=TOKEN_NAME
+                            token_name_mapping=TOKEN_NAME,
+                            model=model,
+                            tokenizer=tokenizer,
+                            device=device
                         )
                         tokenPriceChangeTendency = self.cumulate_price_change_tendency(priceChangeUnit=priceChangeUnit, tokenPriceChangeTendency=tokenPriceChangeTendency)
                         price_change_inference[PriceChangeInferenceKey(defiActionType=[defiAction.defiPurpose for defiAction in defiActions], manipulated_pool=pool)] = tokenPriceChangeTendency
@@ -325,7 +335,7 @@ class UserCall:
                     # else:
                     #     self.record_contract_name(contract_address=pool, platform=platform)
 
-                    tokenPriceChangeTendency = self.generate_price_change_inference_in_known_pool(pool=pool, tokenBalanceChange=tokenBalanceChange)
+                    tokenPriceChangeTendency = self.generate_price_change_inference_in_known_pool(pool=pool, tokenBalanceChange=tokenBalanceChange, model=model, tokenizer=tokenizer, device=device)
                     # print("[+]Price calculation function not found in the user call, token balance in recorded pool {pool_address} is changed".format(pool_address=pool))
                     # tokenPriceChangeTendency = {}
                     # variables_change = {pool: tokenBalanceChange}
@@ -342,7 +352,7 @@ class UserCall:
                             manipulated_pool=pool)] = tokenPriceChangeTendency
         return self.prune_price_change_inference(price_change_inference=price_change_inference)
     
-    def generate_price_change_inference_in_known_pool(self, pool: str, tokenBalanceChange: Dict[str, int]) -> Dict[str, Tendency]:
+    def generate_price_change_inference_in_known_pool(self, pool: str, tokenBalanceChange: Dict[str, int], model, tokenizer, device) -> Dict[str, Tendency]:
         print("[+]Price calculation function not found in the user call, token balance in recorded pool {pool_address} is changed".format(pool_address=pool))
         tokenPriceChangeTendency = {}
         variables_change = {pool: tokenBalanceChange}
@@ -352,7 +362,10 @@ class UserCall:
             code_snippet=None,
             variables_change=variables_change,
             contract_name_mapping=CONTRACT_NAME,
-            token_name_mapping=TOKEN_NAME
+            token_name_mapping=TOKEN_NAME,
+            model=model,
+            tokenizer=tokenizer,
+            device=device
         )
         tokenPriceChangeTendency = self.cumulate_price_change_tendency(priceChangeUnit=priceChangeUnit, tokenPriceChangeTendency=tokenPriceChangeTendency)
         return tokenPriceChangeTendency
