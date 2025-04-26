@@ -1,0 +1,6 @@
+torch==2.5.1
+torchvision==0.20.1
+peft==0.15.2
+deepspeed==0.16.7
+transformers==4.51.3
+datasets==3.3.2
